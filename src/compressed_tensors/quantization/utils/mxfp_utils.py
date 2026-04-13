@@ -6,7 +6,9 @@ import math
 import torch
 from compressed_tensors.quantization.quant_args import (
     BFLOAT16_DATA,
+    FLOAT16_DATA,
     FLOAT32_DATA,
+    FLOAT64_DATA,
     FP4_E2M1_DATA,
     FP8_E4M3_DATA,
     QuantizationArgs,
@@ -87,13 +89,24 @@ def round_to_power_2(x: torch.Tensor) -> torch.Tensor:
         int_dtype = torch.uint16
         mantissa = BFLOAT16_DATA.mantissa
         exponent = BFLOAT16_DATA.exponent
-    else:
-        assert scale_dtype is torch.float32
+    elif scale_dtype is torch.float16:
+        int_dtype = torch.uint16
+        mantissa = FLOAT16_DATA.mantissa
+        exponent = FLOAT16_DATA.exponent
+    elif scale_dtype is torch.float32:
         int_dtype = torch.uint32
         mantissa = FLOAT32_DATA.mantissa
         exponent = FLOAT32_DATA.exponent
+    else:
+        assert scale_dtype is torch.float64
+        int_dtype = torch.uint64
+        mantissa = FLOAT64_DATA.mantissa
+        exponent = FLOAT64_DATA.exponent
 
-    x = x.view(int_dtype).to(torch.int32)
+    if int_dtype in (torch.uint16, torch.uint32):
+        x = x.view(int_dtype).to(torch.int32)
+    else:
+        x = x.view(int_dtype).to(torch.int64)
 
     # Find closest power of 2
     VAL_TO_ADD = 1 << (mantissa - FP4_E2M1_DATA.mantissa - 1)
